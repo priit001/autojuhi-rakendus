@@ -3,4 +3,19 @@ __pycache__/
 *.sqlite3
 *.log
 .env
+# Python
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Editorid
+.vscode/
+
+# OS failid
+.DS_Store
+Thumbs.db
+ehthumbs.db
 
