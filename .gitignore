@@ -19,3 +19,6 @@ build/
 Thumbs.db
 ehthumbs.db
 
+# Sõiduandmed ja ekspordid
+*.csv
+exports/

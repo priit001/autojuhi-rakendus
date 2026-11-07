@@ -1,0 +1,24 @@
+__pycache__/
+*.db
+*.sqlite3
+*.log
+.env
+# Python
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Editorid
+.vscode/
+
+# OS failid
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Sõiduandmed ja ekspordid
+*.csv
+exports/

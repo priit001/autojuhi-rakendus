@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+    <meta charset="UTF-8">
+    <title>Kuu statistika</title>
+</head>
+<body>
+
+<h1>Kilomeetrid kuude kaupa</h1>
+
+<table border="1" cellpadding="5">
+    <tr>
+        <th>Kuu</th>
+        <th>Kilomeetrid</th>
+    </tr>
+    {% for kuu, km in monthly_stats %}
+    <tr>
+        <td>{{ kuu }}</td>
+        <td>{{ km }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<p><a href="/stats">Tagasi statistikale</a></p>
+
+</body>
+</html>

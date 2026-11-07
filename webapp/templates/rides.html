@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+    <meta charset="UTF-8">
+    <title>Kõik sõidud</title>
+</head>
+<body>
+    <h2>Kõik sõidud</h2>
+
+    <table border="1" cellpadding="5">
+        <tr>
+            <th>Kuupäev</th>
+            <th>Kilomeetrid</th>
+            <th>Tulu (€)</th>
+        </tr>
+
+        {% for r in rides %}
+<tr>
+    <td>{{ r.date }}</td>
+    <td>{{ r.km }}</td>
+    <td>{{ r.income }}</td>
+    <td>
+        <form action="/kustuta/{{ loop.index0 }}" method="post" style="display:inline;">
+            <button type="submit">Kustuta</button>
+        </form>
+    </td>
+</tr>
+{% endfor %}
+
+
+    </table>
+
+    <p><a href="/">Tagasi avalehele</a></p>
+</body>
+</html>
+<p>
+    <a href="/export">Ekspordi CSV</a>
+</p>
