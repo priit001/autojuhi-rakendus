@@ -1,6 +1,8 @@
 import sqlite3
+import os
 
-conn = sqlite3.connect('users.db')
+DB_NAME = os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.db")
+conn = sqlite3.connect(DB_NAME)
 cursor = conn.cursor()
 
 cursor.execute('''

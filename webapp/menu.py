@@ -1,7 +1,8 @@
 import sqlite3
 import csv
+import os
 
-DB_NAME = "users.db"
+DB_NAME = os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.db")
 
 def loo_andmebaas():
     conn = sqlite3.connect(DB_NAME)

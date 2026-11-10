@@ -10,17 +10,18 @@
     <table border="1" cellpadding="5">
         <tr>
             <th>Kuupäev</th>
+            <th>Marsruut</th>
             <th>Kilomeetrid</th>
-            <th>Tulu (€)</th>
+            <th></th>
         </tr>
 
         {% for r in rides %}
 <tr>
-    <td>{{ r.date }}</td>
-    <td>{{ r.km }}</td>
-    <td>{{ r.income }}</td>
+    <td>{{ r[1] }}</td>
+    <td>{{ r[2] }}</td>
+    <td>{{ r[3] }}</td>
     <td>
-        <form action="/kustuta/{{ loop.index0 }}" method="post" style="display:inline;">
+        <form action="/kustuta/{{ r[0] }}" method="post" style="display:inline;">
             <button type="submit">Kustuta</button>
         </form>
     </td>

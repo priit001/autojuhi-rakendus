@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 
 app = Flask(__name__)
-DB_NAME = "users.db"
+DB_NAME = os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.db")
 
 def loo_andmebaas():
     conn = sqlite3.connect(DB_NAME)
@@ -73,8 +73,11 @@ def index():
     conn.close()
     return render_template("index.html", soidud=soidud)
 
-@app.route("/lisa", methods=["POST"])
+@app.route("/lisa", methods=["GET", "POST"])
 def lisa_soit():
+    if request.method == "GET":
+        return render_template("add_ride.html")
+
     kuupaev = request.form["kuupaev"]
     marsruut = request.form["marsruut"]
     try:
@@ -89,7 +92,15 @@ def lisa_soit():
     conn.close()
     return redirect("/")
 
-@app.route("/kustuta/<int:id>")
+@app.route("/soidud")
+def soidud():
+    conn, cursor = loo_andmebaas()
+    cursor.execute("SELECT id, kuupaev, marsruut, kilomeetrid FROM soidud")
+    rides = cursor.fetchall()
+    conn.close()
+    return render_template("rides.html", rides=rides)
+
+@app.route("/kustuta/<int:id>", methods=["POST"])
 def kustuta_soit(id):
     conn, cursor = loo_andmebaas()
     cursor.execute("DELETE FROM soidud WHERE id = ?", (id,))
@@ -98,6 +109,7 @@ def kustuta_soit(id):
     return redirect("/")
 
 @app.route("/stats")
+@app.route("/statistika")
 def stats():
     stats = calculate_statistics_from_db()
     return render_template(
@@ -116,7 +128,9 @@ def export_csv():
     conn.close()
 
     timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M")
-    filename = os.path.join("exports", f"soidud_{timestamp}.csv")
+    export_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports")
+    os.makedirs(export_dir, exist_ok=True)
+    filename = os.path.join(export_dir, f"soidud_{timestamp}.csv")
 
     with open(filename, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)

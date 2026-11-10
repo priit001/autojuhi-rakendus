@@ -8,13 +8,13 @@
     <h2>Lisa uus sõit</h2>
     <form action="/lisa" method="post">
         <label>Kuupäev:</label>
-        <input type="date" name="date" required><br><br>
+        <input type="date" name="kuupaev" required><br><br>
+
+        <label>Marsruut:</label>
+        <input type="text" name="marsruut" required><br><br>
 
         <label>Kilomeetrid:</label>
-        <input type="number" name="km" step="0.1" required><br><br>
-
-        <label>Tulu (€):</label>
-        <input type="number" name="income" step="0.01" required><br><br>
+        <input type="number" name="kilomeetrid" step="0.1" required><br><br>
 
         <button type="submit">Lisa</button>
     </form>
