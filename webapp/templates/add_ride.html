@@ -6,15 +6,18 @@
 </head>
 <body>
     <h2>Lisa uus sõit</h2>
+    {% if error %}
+    <p role="alert">{{ error }}</p>
+    {% endif %}
     <form action="/lisa" method="post">
         <label>Kuupäev:</label>
-        <input type="date" name="kuupaev" required><br><br>
+        <input type="date" name="kuupaev" value="{{ kuupaev|default('') }}" required><br><br>
 
         <label>Marsruut:</label>
-        <input type="text" name="marsruut" required><br><br>
+        <input type="text" name="marsruut" value="{{ marsruut|default('') }}" required><br><br>
 
         <label>Kilomeetrid:</label>
-        <input type="number" name="kilomeetrid" step="0.1" required><br><br>
+        <input type="number" name="kilomeetrid" min="0" step="0.1" value="{{ kilomeetrid|default('') }}" required><br><br>
 
         <button type="submit">Lisa</button>
     </form>

@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, send_file
 import sqlite3
 import csv
 from datetime import datetime
+import math
 import os
 
 app = Flask(__name__)
@@ -78,24 +79,52 @@ def lisa_soit():
     if request.method == "GET":
         return render_template("add_ride.html")
 
-    kuupaev = request.form["kuupaev"]
-    marsruut = request.form["marsruut"]
+    kuupaev = request.form.get("kuupaev", "").strip()
+    marsruut = request.form.get("marsruut", "").strip()
+    kilomeetrid_input = request.form.get("kilomeetrid", "").strip()
+    errors = []
+
+    if not kuupaev:
+        errors.append("Kuupäev on kohustuslik.")
+    else:
+        try:
+            datetime.strptime(kuupaev, "%Y-%m-%d")
+        except ValueError:
+            errors.append("Sisesta korrektne kuupäev.")
+
+    if not marsruut:
+        errors.append("Marsruut ei tohi olla tühi.")
+
     try:
-        kilomeetrid = float(request.form["kilomeetrid"])
+        kilomeetrid = float(kilomeetrid_input)
     except ValueError:
-        return "❌ Viga: Kilomeetrid peavad olema arv."
+        errors.append("Kilomeetrid peavad olema arv.")
+    else:
+        if not math.isfinite(kilomeetrid):
+            errors.append("Kilomeetrid peavad olema lõplik arv.")
+        elif kilomeetrid < 0:
+            errors.append("Kilomeetrid ei tohi olla negatiivsed.")
+
+    if errors:
+        return render_template(
+            "add_ride.html",
+            error=" ".join(errors),
+            kuupaev=kuupaev,
+            marsruut=marsruut,
+            kilomeetrid=kilomeetrid_input
+        ), 400
 
     conn, cursor = loo_andmebaas()
     cursor.execute("INSERT INTO soidud (kuupaev, marsruut, kilomeetrid) VALUES (?, ?, ?)",
                    (kuupaev, marsruut, kilomeetrid))
     conn.commit()
     conn.close()
-    return redirect("/")
+    return redirect("/soidud")
 
 @app.route("/soidud")
 def soidud():
     conn, cursor = loo_andmebaas()
-    cursor.execute("SELECT id, kuupaev, marsruut, kilomeetrid FROM soidud")
+    cursor.execute("SELECT id, kuupaev, marsruut, kilomeetrid FROM soidud ORDER BY id DESC")
     rides = cursor.fetchall()
     conn.close()
     return render_template("rides.html", rides=rides)
@@ -106,7 +135,7 @@ def kustuta_soit(id):
     cursor.execute("DELETE FROM soidud WHERE id = ?", (id,))
     conn.commit()
     conn.close()
-    return redirect("/")
+    return redirect("/soidud")
 
 @app.route("/stats")
 @app.route("/statistika")
