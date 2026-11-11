@@ -23,40 +23,26 @@ def loo_andmebaas():
     return conn, cursor
 
 def calculate_statistics_from_db():
-    print("STAT FUNKTSIOON KÄIVITUS")
-
     conn, cursor = loo_andmebaas()
-    cursor.execute("SELECT kilomeetrid FROM soidud")
-    rows = cursor.fetchall()
+    cursor.execute("SELECT COUNT(*), COALESCE(SUM(kilomeetrid), 0) FROM soidud")
+    total_rides, total_km = cursor.fetchone()
     conn.close()
 
-    km_list = [row[0] for row in rows]
-    HIND_KM = 0.5
-
-    if not km_list:
-        return {
-            "total_km": 0,
-            "total_income": 0,
-            "avg_price": 0
-        }
-
-    total_km = sum(km_list)
-    total_income = total_km * HIND_KM
-
     return {
-        "total_km": round(total_km, 2),
-        "total_income": round(total_income, 2),
-        "avg_price": round(HIND_KM, 2)
+        "total_rides": total_rides,
+        "total_km": round(total_km, 2)
     }
 
 
 def calculate_monthly_statistics():
     conn, cursor = loo_andmebaas()
     cursor.execute("""
-        SELECT 
-            substr(kuupaev, 7, 4) || '-' || substr(kuupaev, 4, 2) AS kuu,
-            SUM(kilomeetrid)
+        SELECT
+            strftime('%Y-%m', kuupaev) AS kuu,
+            COUNT(*),
+            COALESCE(SUM(kilomeetrid), 0)
         FROM soidud
+        WHERE strftime('%Y-%m', kuupaev) IS NOT NULL
         GROUP BY kuu
         ORDER BY kuu
     """)
@@ -143,9 +129,8 @@ def stats():
     stats = calculate_statistics_from_db()
     return render_template(
         "stats.html",
-        total_km=stats["total_km"],
-        total_income=stats["total_income"],
-        avg_price=stats["avg_price"]
+        total_rides=stats["total_rides"],
+        total_km=stats["total_km"]
     )
 
 

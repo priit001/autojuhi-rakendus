@@ -11,11 +11,13 @@
 <table border="1" cellpadding="5">
     <tr>
         <th>Kuu</th>
+        <th>Sõitude arv</th>
         <th>Kilomeetrid</th>
     </tr>
-    {% for kuu, km in monthly_stats %}
+    {% for kuu, ride_count, km in monthly_stats %}
     <tr>
         <td>{{ kuu }}</td>
+        <td>{{ ride_count }}</td>
         <td>{{ km }}</td>
     </tr>
     {% endfor %}
