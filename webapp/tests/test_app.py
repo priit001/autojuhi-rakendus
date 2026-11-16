@@ -5,6 +5,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import app as app_module
 
@@ -13,18 +14,22 @@ class AppTestCase(unittest.TestCase):
     def setUp(self):
         self.original_db_name = app_module.DB_NAME
         self.original_app_file = app_module.__file__
+        self.original_backup_dir = app_module.BACKUP_DIR
         self.original_testing = app_module.app.config.get("TESTING")
         self.temp_dir = tempfile.TemporaryDirectory(prefix="autojuhi_test_")
         self.addCleanup(self.temp_dir.cleanup)
         self.addCleanup(setattr, app_module, "DB_NAME", self.original_db_name)
         self.addCleanup(setattr, app_module, "__file__", self.original_app_file)
+        self.addCleanup(setattr, app_module, "BACKUP_DIR", self.original_backup_dir)
         self.addCleanup(app_module.app.config.__setitem__, "TESTING", self.original_testing)
 
         self.test_root = Path(self.temp_dir.name)
         self.app_root = self.test_root / "webapp"
         self.app_root.mkdir()
+        self.backup_dir = self.test_root / "backups"
         app_module.DB_NAME = str(self.test_root / "users_test.db")
         app_module.__file__ = str(self.app_root / "app.py")
+        app_module.BACKUP_DIR = str(self.backup_dir)
         app_module.app.config["TESTING"] = True
 
         connection, _ = app_module.loo_andmebaas()
@@ -265,6 +270,87 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         actual = [(row[1], row[2], row[3]) for row in self.read_rides(roundtrip_database)]
         self.assertEqual(actual, expected)
+
+    def test_backup_route_creates_backup_and_shows_success(self):
+        self.insert_ride("2026-01-03", "Tallinn-Tartu", 186.5)
+
+        response = self.client.post("/backup")
+        backup_files = list(self.backup_dir.glob("*.db"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(backup_files), 1)
+        self.assertIn("Varukoopia loodud ja kontrollitud", response.get_data(as_text=True))
+        self.assertRegex(backup_files[0].name, r"^users_\d{8}_\d{6}_\d{6}(?:_\d+)?\.db$")
+
+    def test_backup_preserves_source_data(self):
+        self.insert_ride("2026-01-03", "Tallinn-Tartu", 186.5)
+        source_before = self.read_rides()
+
+        backup_path, _ = app_module.create_database_backup()
+
+        self.assertEqual(self.read_rides(), source_before)
+        self.assertTrue(Path(backup_path).is_file())
+
+    def test_backup_contains_same_table_and_data(self):
+        self.insert_ride("2026-01-03", "Tallinn-Tartu", 186.5)
+        self.insert_ride("2026-02-04", "Tartu-Parnu", 128)
+
+        backup_path, ride_count = app_module.create_database_backup()
+
+        self.assertEqual(ride_count, 2)
+        self.assertEqual(self.read_rides(backup_path), self.read_rides())
+        connection = sqlite3.connect(backup_path)
+        try:
+            table = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'soidud'"
+            ).fetchone()
+        finally:
+            connection.close()
+        self.assertIsNotNone(table)
+
+    def test_repeated_backups_do_not_overwrite_existing_files(self):
+        self.insert_ride("2026-01-03", "Tallinn-Tartu", 186.5)
+        fixed_time = app_module.datetime(2026, 1, 1, 12, 0, 0, 0)
+        with patch.object(app_module, "datetime") as datetime_mock:
+            datetime_mock.now.return_value = fixed_time
+            first_backup, _ = app_module.create_database_backup()
+            self.insert_ride("2026-02-04", "Tartu-Parnu", 128)
+            second_backup, _ = app_module.create_database_backup()
+
+        self.assertNotEqual(first_backup, second_backup)
+        self.assertEqual(len(list(self.backup_dir.glob("*.db"))), 2)
+        self.assertEqual(len(self.read_rides(first_backup)), 1)
+        self.assertEqual(len(self.read_rides(second_backup)), 2)
+
+    def test_missing_and_corrupt_source_databases_are_reported(self):
+        missing_database = self.test_root / "missing.db"
+        app_module.DB_NAME = str(missing_database)
+        missing_response = self.client.post("/backup")
+
+        self.assertEqual(missing_response.status_code, 400)
+        self.assertFalse(missing_database.exists())
+
+        corrupt_database = self.test_root / "corrupt.db"
+        corrupt_database.write_bytes(b"not a SQLite database")
+        app_module.DB_NAME = str(corrupt_database)
+        corrupt_response = self.client.post("/backup")
+
+        self.assertEqual(corrupt_response.status_code, 400)
+        self.assertEqual(corrupt_database.read_bytes(), b"not a SQLite database")
+        self.assertEqual(list(self.backup_dir.glob("*.db")), [])
+
+    def test_backup_verification_is_read_only_and_rejects_invalid_files(self):
+        self.insert_ride("2026-01-03", "Tallinn-Tartu", 186.5)
+        backup_path, ride_count = app_module.create_database_backup()
+        backup_bytes = Path(backup_path).read_bytes()
+
+        self.assertEqual(app_module.verify_database_backup(backup_path), ride_count)
+        self.assertEqual(Path(backup_path).read_bytes(), backup_bytes)
+
+        invalid_backup = self.test_root / "invalid_backup.db"
+        invalid_backup.write_bytes(b"not a SQLite database")
+        with self.assertRaises(ValueError):
+            app_module.verify_database_backup(invalid_backup)
 
 
 if __name__ == "__main__":

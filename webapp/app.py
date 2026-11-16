@@ -5,9 +5,11 @@ import io
 from datetime import datetime
 import math
 import os
+from pathlib import Path
 
 app = Flask(__name__)
 DB_NAME = os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.db")
+BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backups")
 
 def loo_andmebaas():
     conn = sqlite3.connect(DB_NAME)
@@ -85,6 +87,77 @@ def render_import_result(message, status=200):
     return render_template("index.html", import_message=message), status
 
 
+def open_readonly_database(database_path):
+    database_uri = Path(database_path).resolve().as_uri() + "?mode=ro"
+    return sqlite3.connect(database_uri, uri=True)
+
+
+def verify_database_backup(backup_path):
+    connection = None
+    try:
+        connection = open_readonly_database(backup_path)
+        integrity = connection.execute("PRAGMA integrity_check").fetchone()
+        if integrity != ("ok",):
+            raise ValueError("Varukoopia tervikluse kontroll ebaõnnestus.")
+
+        columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(soidud)")
+        }
+        required_columns = {"id", "kuupaev", "marsruut", "kilomeetrid"}
+        if not required_columns.issubset(columns):
+            raise ValueError("Varukoopias puudub nõutud soidud tabel või selle veerud.")
+
+        ride_count = connection.execute("SELECT COUNT(*) FROM soidud").fetchone()[0]
+        connection.execute(
+            "SELECT id, kuupaev, marsruut, kilomeetrid FROM soidud LIMIT 1"
+        ).fetchone()
+        return ride_count
+    except sqlite3.Error as error:
+        raise ValueError("Varukoopia ei ole loetav SQLite andmebaas.") from error
+    finally:
+        if connection is not None:
+            connection.close()
+
+
+def create_database_backup():
+    if not os.path.isfile(DB_NAME):
+        raise FileNotFoundError("Lähteandmebaasi ei leitud.")
+
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    suffix = 0
+    while True:
+        suffix_text = f"_{suffix}" if suffix else ""
+        backup_path = os.path.join(BACKUP_DIR, f"users_{timestamp}{suffix_text}.db")
+        try:
+            with open(backup_path, "xb"):
+                pass
+            break
+        except FileExistsError:
+            suffix += 1
+
+    source = None
+    destination = None
+    try:
+        source = open_readonly_database(DB_NAME)
+        destination = sqlite3.connect(backup_path)
+        source.backup(destination)
+        destination.close()
+        destination = None
+        source.close()
+        source = None
+        ride_count = verify_database_backup(backup_path)
+        return backup_path, ride_count
+    except Exception:
+        if destination is not None:
+            destination.close()
+        if source is not None:
+            source.close()
+        if os.path.exists(backup_path):
+            os.remove(backup_path)
+        raise
+
+
 @app.route("/")
 def index():
     conn, cursor = loo_andmebaas()
@@ -118,6 +191,21 @@ def lisa_soit():
     conn.commit()
     conn.close()
     return redirect("/soidud")
+
+
+@app.route("/backup", methods=["POST"])
+def backup_database():
+    try:
+        backup_path, ride_count = create_database_backup()
+    except (OSError, sqlite3.Error, ValueError) as error:
+        message = f"Varundamine ebaõnnestus: {error}"
+        return render_template("index.html", backup_message=message), 400
+
+    message = (
+        f"Varukoopia loodud ja kontrollitud: {os.path.basename(backup_path)} "
+        f"({ride_count} sõitu)."
+    )
+    return render_template("index.html", backup_message=message)
 
 
 @app.route("/import", methods=["POST"])

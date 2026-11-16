@@ -19,6 +19,12 @@
 {% if import_message %}
 <p role="status">{{ import_message }}</p>
 {% endif %}
+<form action="/backup" method="post">
+  <button type="submit">Loo andmebaasi varukoopia</button>
+</form>
+{% if backup_message %}
+<p role="status">{{ backup_message }}</p>
+{% endif %}
 <a href="/stats">
   <button type="button">Statistika</button>
 </a>

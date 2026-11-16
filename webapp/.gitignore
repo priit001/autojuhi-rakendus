@@ -22,3 +22,4 @@ ehthumbs.db
 # Sõiduandmed ja ekspordid
 *.csv
 exports/
+backups/
