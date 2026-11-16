@@ -1,37 +1,33 @@
-# Autojuhi töölähetuste haldusrakendus
+# Autojuhi rakendus
 
-## Eesmärk
-Veebipõhine tööriist transpordiettevõtetele, mis võimaldab koostada ja hallata erinevat tüüpi töölähetusraporteid vastavalt palgasüsteemile ja tööiseloomule.
+Flaski ja SQLite'i rakendus sõitude lisamiseks, vaatamiseks, statistika kuvamiseks ning CSV importimiseks ja eksportimiseks. Rakendus võimaldab luua ja kontrollida SQLite'i varukoopiaid.
 
-## Funktsioonid
+## Tavakasutus
 
-### 1. Päevapalgapõhised raportid
-- Korduvad marsruudid
-- Kindel päevatasu
-- Lihtne sisestus
+Käivita rakendus `webapp` kaustast:
 
-### 2. Tunnipalga raportid koos päevarahadega
-- Kodumaine ja välismaine päevaraha (nt Soome, Rootsi süsteemid)
-- Mitme kliendi ja koha sisestus ühe päeva kohta
-- Odomeetrinäidud, kellaajad, kliendi nimed
-- GPS-põhine automaatne kohamääramine
-- Tankimise andmed koos auto numbriga
+```powershell
+python app.py
+```
 
-### 3. Kilomeetripõhised raportid
-- Päevaraha lisamise võimalus vastavalt lepingule
-- Marsruudi ja läbitud vahemaa põhine arvestus
+Ava rakendus kohalikus arvutis aadressil http://127.0.0.1:5000. Tavakäivitus kasutab ainult `127.0.0.1` aadressi ja Flaski debug-režiim on välja lülitatud. `main.py` jääb samale käivitusfunktsioonile suunavaks ühilduvaks käivitajaks; tavaliseks kasutuseks kasuta `app.py`.
 
-## Tulevikuideed
-- PDF-raportite genereerimine
-- Administraatori ja juhi rollid
-- Statistika ja aruandlus
-- Mobiilivaade
-- Kliendiandmete salvestus ja korduvkasutus
+**Turvahoiatus:** praegusel versioonil puudub autentimine. Ära muuda host-aadressi ega ava rakendust LAN-i või interneti kaudu enne autentimise lisamist ja eraldi turvakontrolli.
 
-## Tehnoloogia
-- Python + Flask
-- SQLite andmebaas
-- GitHub versioonihaldus
+## Testid
 
-## Autor
-Priit – projekt algatatud 2025. aastal
+Käivita `webapp` kaustast:
+
+```powershell
+python -m unittest discover -s tests -p "test_app.py" -v
+```
+
+Testid kasutavad ajutisi andmebaase ja varunduskaustu.
+
+## Andmefailid
+
+- SQLite'i andmebaas: `webapp/users.db`
+- SQLite'i varukoopiad: `webapp/backups/`; kaust luuakse esimese varundamise ajal.
+- CSV ekspordid: `webapp/exports/`
+
+Andmebaasi, varukoopiaid ja ekspordifaile ei lisata Git-i. Hoia varukoopiat eraldi turvalises asukohas; samas arvutis olev varukoopia ei kaitse ketta rikke ega arvuti kadumise eest.

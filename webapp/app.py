@@ -333,6 +333,11 @@ def stats_kuud():
     monthly_stats = calculate_monthly_statistics()
     return render_template("stats_kuud.html", monthly_stats=monthly_stats)
 
+
+def run_app():
+    app.run(host="127.0.0.1", debug=False)
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    run_app()
 

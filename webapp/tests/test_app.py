@@ -69,6 +69,12 @@ class AppTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_normal_startup_is_local_and_debug_is_disabled(self):
+        with patch.object(app_module.app, "run") as run_mock:
+            app_module.run_app()
+
+        run_mock.assert_called_once_with(host="127.0.0.1", debug=False)
+
     def test_add_ride_form_opens(self):
         response = self.client.get("/lisa")
 
