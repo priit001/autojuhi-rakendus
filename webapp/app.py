@@ -83,6 +83,23 @@ def validate_ride(kuupaev, marsruut, kilomeetrid_input):
     return errors, kilomeetrid
 
 
+def ride_duplicate_key(kuupaev, marsruut, kilomeetrid):
+    kuupaev = str(kuupaev or "").strip()
+    marsruut = str(marsruut or "").strip()
+    if not kuupaev or not marsruut or kilomeetrid is None:
+        return None
+
+    try:
+        kuupaev = datetime.strptime(kuupaev, "%Y-%m-%d").date().isoformat()
+        kilomeetrid = float(kilomeetrid)
+    except (TypeError, ValueError):
+        return None
+
+    if not math.isfinite(kilomeetrid):
+        return None
+    return kuupaev, marsruut, kilomeetrid
+
+
 def render_import_result(message, status=200):
     return render_template("index.html", import_message=message), status
 
@@ -264,22 +281,51 @@ def import_csv():
     if not valid_rides and not invalid_rows:
         return render_import_result("CSV-failis ei ole sõiduandmeid.", 400)
 
+    duplicate_count = 0
+    imported_rides = []
     if valid_rides:
         conn, cursor = loo_andmebaas()
-        cursor.executemany(
-            "INSERT INTO soidud (kuupaev, marsruut, kilomeetrid) VALUES (?, ?, ?)",
-            valid_rides
-        )
-        conn.commit()
-        conn.close()
+        try:
+            cursor.execute("BEGIN IMMEDIATE")
+            existing_rides = cursor.execute(
+                "SELECT kuupaev, marsruut, kilomeetrid FROM soidud"
+            ).fetchall()
+            seen_keys = {
+                key
+                for row in existing_rides
+                if (key := ride_duplicate_key(*row)) is not None
+            }
 
-    message = f"Imporditi {len(valid_rides)} sõitu."
+            for ride in valid_rides:
+                key = ride_duplicate_key(*ride)
+                if key in seen_keys:
+                    duplicate_count += 1
+                    continue
+                seen_keys.add(key)
+                imported_rides.append(ride)
+
+            cursor.executemany(
+                "INSERT INTO soidud (kuupaev, marsruut, kilomeetrid) VALUES (?, ?, ?)",
+                imported_rides
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    message = (
+        f"Imporditi {len(imported_rides)} sõitu. "
+        f"{duplicate_count} duplikaati jäeti vahele. "
+        f"{len(invalid_rows)} vigast rida lükati tagasi."
+    )
     if invalid_rows:
         shown_errors = " ".join(invalid_rows[:5])
         remaining_count = len(invalid_rows) - 5
         if remaining_count > 0:
             shown_errors += f" Lisaks {remaining_count} vigast rida."
-        message += f" Vahele jäeti {len(invalid_rows)} vigast rida: {shown_errors}"
+        message += f" {shown_errors}"
     return render_import_result(message, 400 if invalid_rows else 200)
 
 

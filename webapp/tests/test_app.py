@@ -204,6 +204,123 @@ class AppTestCase(unittest.TestCase):
             [("2026-01-03", "Tallinn-Tartu", 186.5), ("2026-02-04", "Tartu-Parnu", 128.0)],
         )
 
+    def test_csv_imports_all_new_rows_and_reports_counts(self):
+        response = self.upload_csv(
+            b"kuupaev,marsruut,kilomeetrid\n"
+            b"2026-01-03,Tallinn-Tartu,186.5\n"
+            b"2026-02-04,Tartu-Parnu,128\n"
+        )
+        message = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Imporditi 2 sõitu.", message)
+        self.assertIn("0 duplikaati jäeti vahele.", message)
+        self.assertIn("0 vigast rida lükati tagasi.", message)
+        self.assertEqual(len(self.read_rides()), 2)
+
+    def test_csv_import_skips_existing_rows_and_imports_new_rows(self):
+        self.insert_ride("2026-01-03", "Tallinn-Tartu", 186.5)
+
+        response = self.upload_csv(
+            b"kuupaev,marsruut,kilomeetrid\n"
+            b"2026-01-03,Tallinn-Tartu,186.5\n"
+            b"2026-02-04,Tartu-Parnu,128\n"
+        )
+        message = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Imporditi 1 sõitu.", message)
+        self.assertIn("1 duplikaati jäeti vahele.", message)
+        self.assertIn("0 vigast rida lükati tagasi.", message)
+        self.assertEqual(len(self.read_rides()), 2)
+
+    def test_csv_import_skips_all_rows_when_all_are_existing(self):
+        self.insert_ride("2026-01-03", "Tallinn-Tartu", 186.5)
+        self.insert_ride("2026-02-04", "Tartu-Parnu", 128)
+
+        response = self.upload_csv(
+            b"kuupaev,marsruut,kilomeetrid\n"
+            b"2026-01-03,Tallinn-Tartu,186.5\n"
+            b"2026-02-04,Tartu-Parnu,128.0\n"
+        )
+        message = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Imporditi 0 sõitu.", message)
+        self.assertIn("2 duplikaati jäeti vahele.", message)
+        self.assertEqual(len(self.read_rides()), 2)
+
+    def test_csv_import_skips_duplicate_rows_within_file(self):
+        response = self.upload_csv(
+            b"kuupaev,marsruut,kilomeetrid\n"
+            b"2026-01-03,Tallinn-Tartu,10\n"
+            b"2026-01-03,Tallinn-Tartu,10.0\n"
+            b"2026-01-03,Tallinn-Tartu,10\n"
+        )
+        message = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Imporditi 1 sõitu.", message)
+        self.assertIn("2 duplikaati jäeti vahele.", message)
+        self.assertEqual(len(self.read_rides()), 1)
+
+    def test_csv_duplicate_key_normalizes_numeric_kilometers(self):
+        self.insert_ride("2026-01-03", "Tallinn-Tartu", 10)
+
+        response = self.upload_csv(
+            b"kuupaev,marsruut,kilomeetrid\n2026-01-03,Tallinn-Tartu,10.0\n"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(self.read_rides()), 1)
+        self.assertIn("1 duplikaati jäeti vahele.", response.get_data(as_text=True))
+
+    def test_csv_import_reports_new_duplicate_and_invalid_row_counts(self):
+        self.insert_ride("2026-01-03", "Tallinn-Tartu", 10)
+
+        response = self.upload_csv(
+            b"kuupaev,marsruut,kilomeetrid\n"
+            b"2026-02-04,Tartu-Parnu,20\n"
+            b"2026-01-03,Tallinn-Tartu,10.0\n"
+            b"2026-02-05,Tallinn,invalid\n"
+        )
+        message = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Imporditi 1 sõitu.", message)
+        self.assertIn("1 duplikaati jäeti vahele.", message)
+        self.assertIn("1 vigast rida lükati tagasi.", message)
+        self.assertEqual(len(self.read_rides()), 2)
+
+    def test_csv_import_summary_counts_each_outcome(self):
+        self.insert_ride("2026-01-03", "Tallinn-Tartu", 10)
+
+        response = self.upload_csv(
+            b"kuupaev,marsruut,kilomeetrid\n"
+            b"2026-02-04,Tartu-Parnu,20\n"
+            b"2026-01-03,Tallinn-Tartu,10.0\n"
+            b"2026-02-04,Tartu-Parnu,20.0\n"
+            b"2026-02-05,,30\n"
+            b"2026-02-06,Tallinn,invalid\n"
+        )
+        message = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Imporditi 1 sõitu.", message)
+        self.assertIn("2 duplikaati jäeti vahele.", message)
+        self.assertIn("2 vigast rida lükati tagasi.", message)
+        self.assertEqual(len(self.read_rides()), 2)
+
+    def test_manual_addition_still_allows_duplicate_rides(self):
+        ride = {"kuupaev": "2026-01-03", "marsruut": "Tallinn-Tartu", "kilomeetrid": "10"}
+
+        first_response = self.client.post("/lisa", data=ride)
+        second_response = self.client.post("/lisa", data=ride)
+
+        self.assertEqual(first_response.status_code, 302)
+        self.assertEqual(second_response.status_code, 302)
+        self.assertEqual(len(self.read_rides()), 2)
+
     def test_invalid_csv_rows_are_rejected_without_invalid_inserts(self):
         invalid_rows = (
             b"kuupaev,marsruut,kilomeetrid\n2026-01-03,   ,10\n",
